@@ -160,7 +160,8 @@ module copper(
     output       logic [15:0]   xr_ram_wr_data_o,       // General, for all RAM block writes
     output       logic [10:0]   coppermem_rd_addr_o,
     output       logic          coppermem_rd_en_o,
-    input   wire logic [15:0]   coppermem_rd_data_i,
+    input   wire logic [15:0]   coppermem_e_rd_data_i,
+    input   wire logic [15:0]   coppermem_o_rd_data_i,
     input   wire logic          regs_xr_reg_sel_i,
     input   wire logic          regs_tilemem_sel_i,
     input   wire logic          regs_colormem_sel_i,
@@ -299,15 +300,16 @@ always_ff @(posedge clk) begin
                 end
                 // State 2 - Wait for copper RAM
                 STATE_LATCH1: begin
-                    r_insn[31:16]   <= coppermem_rd_data_i;
-                    copper_ex_state <= STATE_LATCH2;
-                end
-                // State 3 - Latch second word
-                STATE_LATCH2: begin
-                    ram_rd_strobe   <= 1'b0;
-                    r_insn[15:0]    <= coppermem_rd_data_i;
+                    r_insn[31:16]   <= coppermem_e_rd_data_i;
+                    r_insn[15:0]    <= coppermem_o_rd_data_i;
                     copper_ex_state <= STATE_EXEC;
                 end
+                // State 3 - Latch second word
+//                STATE_LATCH2: begin
+//                    ram_rd_strobe   <= 1'b0;
+//                    r_insn[15:0]    <= coppermem_rd_data_i;
+//                    copper_ex_state <= STATE_EXEC;
+//                end
                 // State 4 - Execution
                 STATE_EXEC: begin
 

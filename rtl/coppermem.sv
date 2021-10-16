@@ -15,11 +15,11 @@
 module coppermem(
            input  wire logic        clk,
            input  wire logic        rd_en_i,
-           input  wire logic [10:0] rd_address_i,
+           input  wire logic [9:0]  rd_address_i,
            output      logic [15:0] rd_data_o,
            input  wire logic        wr_clk,
            input  wire logic        wr_en_i,
-           input  wire logic [10:0] wr_address_i,
+           input  wire logic [9:0]  wr_address_i,
            input  wire logic [15:0] wr_data_i
        );
 
@@ -60,7 +60,7 @@ end
 
 // infer 8x4KB copper BRAM
 //integer i;
-logic [15: 0] bram[0 : 2047];
+logic [15: 0] bram[0 : 1023];
 
 // infer BRAM block
 always_ff @(posedge wr_clk) begin
