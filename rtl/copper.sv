@@ -227,11 +227,32 @@ always_comb   copp_reset  = h_count_i == xv::VISIBLE_WIDTH + xv::H_FRONT_PORCH +
 
 // The following are setup in STATE_PRECOMP for use in 
 // STATE_EXEC if needed...
-logic         ignore_v;
 logic         v_reached;
-logic         ignore_h;
 logic         h_reached;
 logic  [9:0]  copper_pc_skip;
+
+// These are done combinatorially, but should (?) be
+// stable by the time they're needed...
+logic         ignore_v;
+logic         ignore_h;
+logic  [9:0]  copper_pc_jmp;
+logic [15:0]  move_data;
+logic  [7:0]  move_r_p_addr;
+logic [11:0]  move_f_addr;
+logic [10:0]  move_c_addr_v_pos;
+logic [10:0]  h_pos;
+logic  [3:0]  opcode;
+
+assign ignore_v                 = r_insn[0];
+assign ignore_h                 = r_insn[1];
+assign copper_pc_jmp            = r_insn[25:16];
+assign move_data                = r_insn[15:0];
+assign move_r_p_addr            = r_insn[23:16];
+assign move_f_addr              = r_insn[27:16];
+assign move_c_addr_v_pos        = r_insn[26:16];
+assign h_pos                    = r_insn[14:4];
+assign opcode                   = r_insn[31:28];
+
 
 always_ff @(posedge clk) begin
     if (reset_i) begin
@@ -314,17 +335,14 @@ always_ff @(posedge clk) begin
                 // State 3 - Precompuation (calculate some things used in
                 // exec, done here for timing reasons).
                 STATE_PRECOMP: begin
-                    ignore_v        <= r_insn[0];
-                    v_reached       <= v_count_i >= r_insn[26:16];      // Vert pos reached?
-                    ignore_h        <= r_insn[1];
-                    h_reached       <= h_count_i >= r_insn[14:4];       // Horiz pos reached?
+                    v_reached       <= v_count_i >= move_c_addr_v_pos;  // Vert pos reached?
+                    h_reached       <= h_count_i >= h_pos;              // Horiz pos reached?
                     copper_pc_skip  <= copper_pc + 1;                   // Next PC if skipping
                     copper_ex_state <= STATE_EXEC;
                 end
                 // State 4 - Execution (Main)
                 STATE_EXEC: begin
-
-                    case (r_insn[31:28])
+                    case (opcode)
                         // WAIT and SKIP instructions have a second execution 
                         // state, during which next instruction read is also 
                         // set up...
@@ -344,6 +362,7 @@ always_ff @(posedge clk) begin
                                         ram_rd_strobe       <= 1'b1;
                                     end
                                     else begin
+                                        // continue testing...
                                         copper_ex_state     <= STATE_PRECOMP;
                                     end
                                 end
@@ -358,6 +377,7 @@ always_ff @(posedge clk) begin
                                         ram_rd_strobe       <= 1'b1;
                                     end
                                     else begin
+                                        // continue testing...
                                         copper_ex_state     <= STATE_PRECOMP;
                                     end
                                 end
@@ -370,6 +390,7 @@ always_ff @(posedge clk) begin
                                         ram_rd_strobe       <= 1'b1;
                                     end
                                     else begin
+                                        // continue testing...
                                         copper_ex_state     <= STATE_PRECOMP;
                                     end
                                 end
@@ -414,7 +435,7 @@ always_ff @(posedge clk) begin
                         end
                         INSN_JUMP: begin
                             // jmp
-                            copper_pc               <= r_insn[25:16];
+                            copper_pc               <= copper_pc_jmp;
                             copper_ex_state         <= STATE_WAIT;
                             ram_rd_strobe           <= 1'b1;
                         end
@@ -423,8 +444,8 @@ always_ff @(posedge clk) begin
                             if (!regs_xr_reg_sel_i) begin
                                 xr_wr_strobe            <= 1'b1;
                                 ram_wr_addr_out[15:8]   <= 8'h0;
-                                ram_wr_addr_out[7:0]    <= r_insn[23:16];
-                                ram_wr_data_out         <= r_insn[15:0];
+                                ram_wr_addr_out[7:0]    <= move_r_p_addr;
+                                ram_wr_data_out         <= move_data;
 
                                 // Setup fetch next instruction
                                 copper_ex_state         <= STATE_WAIT;
@@ -436,8 +457,8 @@ always_ff @(posedge clk) begin
                             if (!regs_tilemem_sel_i) begin
                                 xr_wr_strobe            <= 1'b1;
                                 ram_wr_addr_out[15:12]  <= xv::XR_TILE_MEM[15:12];
-                                ram_wr_addr_out[11:0]   <= r_insn[27:16];
-                                ram_wr_data_out         <= r_insn[15:0];
+                                ram_wr_addr_out[11:0]   <= move_f_addr;
+                                ram_wr_data_out         <= move_data;
 
                                 // Setup fetch next instruction
                                 copper_ex_state         <= STATE_WAIT;
@@ -449,8 +470,8 @@ always_ff @(posedge clk) begin
                             if (!regs_colormem_sel_i) begin
                                 xr_wr_strobe            <= 1'b1;
                                 ram_wr_addr_out[15:8]   <= xv::XR_COLOR_MEM[15:8];
-                                ram_wr_addr_out[7:0]    <= r_insn[23:16];
-                                ram_wr_data_out         <= r_insn[15:0];
+                                ram_wr_addr_out[7:0]    <= move_r_p_addr;
+                                ram_wr_data_out         <= move_data;
 
                                 // Setup fetch next instruction
                                 copper_ex_state         <= STATE_WAIT;
@@ -462,8 +483,8 @@ always_ff @(posedge clk) begin
                             if (!regs_coppermem_sel_i) begin
                                 xr_wr_strobe            <= 1'b1;
                                 ram_wr_addr_out[15:11]  <= xv::XR_COPPER_MEM[15:11];
-                                ram_wr_addr_out[10:0]   <= r_insn[26:16];
-                                ram_wr_data_out         <= r_insn[15:0];
+                                ram_wr_addr_out[10:0]   <= move_c_addr_v_pos;
+                                ram_wr_data_out         <= move_data;
                         
                                 // Setup fetch next instruction
                                 copper_ex_state         <= STATE_WAIT;
