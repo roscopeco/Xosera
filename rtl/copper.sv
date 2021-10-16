@@ -225,8 +225,13 @@ logic         copp_reset;
 always_comb   copp_reset  = h_count_i == xv::VISIBLE_WIDTH + xv::H_FRONT_PORCH + xv::H_SYNC_PULSE + xv::H_BACK_PORCH - 5 &&
                             v_count_i == xv::VISIBLE_HEIGHT + xv::V_FRONT_PORCH + xv::V_SYNC_PULSE + xv::V_BACK_PORCH - 1;
 
+// The following are setup in STATE_PRECOMP for use in 
+// STATE_EXEC if needed...
+logic         ignore_v;
 logic         v_reached;
+logic         ignore_h;
 logic         h_reached;
+logic  [9:0]  copper_pc_skip;
 
 always_ff @(posedge clk) begin
     if (reset_i) begin
@@ -287,8 +292,11 @@ always_ff @(posedge clk) begin
                     if (copper_en) begin
                         // If copper is enabled, proceed
                         copper_ex_state <= STATE_LATCH;
+
+                        // Inc PC here, next cycle will still see data from
+                        // current PC, so this just gets ready for next
+                        // time...
                         copper_pc       <= copper_pc + 1;
-                        ram_rd_strobe   <= 1'b1;
                     end
                     else begin
                         // else, go back to INIT state and stay there...
@@ -306,8 +314,11 @@ always_ff @(posedge clk) begin
                 // State 3 - Precompuation (calculate some things used in
                 // exec, done here for timing reasons).
                 STATE_PRECOMP: begin
-                    v_reached       <= v_count_i >= r_insn[26:16];
-                    h_reached       <= h_count_i >= r_insn[14:4];
+                    ignore_v        <= r_insn[0];
+                    v_reached       <= v_count_i >= r_insn[26:16];      // Vert pos reached?
+                    ignore_h        <= r_insn[1];
+                    h_reached       <= h_count_i >= r_insn[14:4];       // Horiz pos reached?
+                    copper_pc_skip  <= copper_pc + 1;                   // Next PC if skipping
                     copper_ex_state <= STATE_EXEC;
                 end
                 // State 4 - Execution (Main)
@@ -319,9 +330,9 @@ always_ff @(posedge clk) begin
                         // set up...
                         INSN_WAIT: begin
                             // executing wait
-                            if (r_insn[0]) begin
+                            if (ignore_v) begin
                                 // Ignoring vertical position
-                                if (r_insn[1]) begin
+                                if (ignore_h) begin
                                     // Ignoring horizontal position - wait
                                     // forever, nothing to do... 
                                 end
@@ -339,7 +350,7 @@ always_ff @(posedge clk) begin
                             end 
                             else begin
                                 // Not ignoring vertical position
-                                if (r_insn[1]) begin
+                                if (ignore_h) begin
                                     // Checking only vertical position
                                     if (v_reached) begin
                                         // Setup fetch next instruction
@@ -366,33 +377,33 @@ always_ff @(posedge clk) begin
                         end
                         INSN_SKIP: begin
                             // skip
-                            if (r_insn[0]) begin
+                            if (ignore_v) begin
                                 // Ignoring vertical position
-                                if (r_insn[1]) begin
+                                if (ignore_h) begin
                                     // Ignoring horizontal position, so
                                     // always skip.
-                                    copper_pc       <= copper_pc + 1;
+                                    copper_pc       <= copper_pc_skip;
                                 end
                                 else begin
                                     // Checking only horizontal position
                                     if (h_reached) begin
-                                        copper_pc       <= copper_pc + 1;
+                                        copper_pc       <= copper_pc_skip;
                                     end
                                 end
                             end 
                             else begin
                                 // Not ignoring vertical position
-                                if (r_insn[1]) begin
+                                if (ignore_h) begin
                                     // Checking only vertical position
                                     if (v_reached) begin
-                                        copper_pc       <= copper_pc + 1;
+                                        copper_pc       <= copper_pc_skip;
                                     end
                                 end
                                 else begin
                                     // Checking both horizontal and
                                     // vertical positions
                                     if (h_reached && v_reached) begin
-                                        copper_pc       <= copper_pc + 1;
+                                        copper_pc       <= copper_pc_skip;
                                     end
                                 end
                             end
@@ -465,7 +476,7 @@ always_ff @(posedge clk) begin
                             copper_ex_state <= STATE_WAIT;
                             ram_rd_strobe   <= 1'b1;
                         end
-                    endcase // Instruction                  
+                    endcase // Instruction
                 end
                 default: ; // Should never happen
             endcase // Execution state
