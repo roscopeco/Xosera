@@ -143,9 +143,7 @@ logic  coppermem_o_wr_in;
 assign coppermem_e_wr_in        = coppermem_wr_in & !coppermem_wr_addr_in[0];
 assign coppermem_o_wr_in        = coppermem_wr_in &  coppermem_wr_addr_in[0];
 
-/* verilator lint_off UNUSED */
-logic [10:0]    copper_pc;
-/* verilator lint_on UNUSED */
+logic  [9:0]    copper_pc;
 logic           coppermem_rd_en;
 logic [15:0]    coppermem_e_rd_data_out;
 logic [15:0]    coppermem_o_rd_data_out;
@@ -353,7 +351,7 @@ copper copper(
 coppermem coppermem_e(
     .clk(clk),
     .rd_en_i(coppermem_rd_en),
-    .rd_address_i(copper_pc[10:1]),
+    .rd_address_i(copper_pc),
     .rd_data_o(coppermem_e_rd_data_out),
     .wr_clk(clk),
     .wr_en_i(coppermem_e_wr_in),
@@ -365,7 +363,7 @@ coppermem coppermem_e(
 coppermem coppermem_o(
     .clk(clk),
     .rd_en_i(coppermem_rd_en),
-    .rd_address_i(copper_pc[10:1]),
+    .rd_address_i(copper_pc),
     .rd_data_o(coppermem_o_rd_data_out),
     .wr_clk(clk),
     .wr_en_i(coppermem_o_wr_in),

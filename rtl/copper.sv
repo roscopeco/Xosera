@@ -110,7 +110,7 @@
 //          Skip if a given screen position has been reached.
 //
 //
-//      JMP   - [0100 oAAA AAAA AAAA],[oooo oooo oooo oooo]
+//      JMP   - [0100 ooAA AAAA AAAA],[oooo oooo oooo oooo]
 //
 //          Jump to the given copper RAM address.
 //
@@ -158,7 +158,7 @@ module copper(
     output       logic          xr_ram_wr_en_o,         // General, for all RAM block writes
     output       logic [15:0]   xr_ram_wr_addr_o,       // General, for all RAM block writes
     output       logic [15:0]   xr_ram_wr_data_o,       // General, for all RAM block writes
-    output       logic [10:0]   coppermem_rd_addr_o,
+    output       logic  [9:0]   coppermem_rd_addr_o,
     output       logic          coppermem_rd_en_o,
     input   wire logic [15:0]   coppermem_e_rd_data_i,
     input   wire logic [15:0]   coppermem_o_rd_data_i,
@@ -199,12 +199,12 @@ logic  [2:0]  copper_ex_state   = STATE_INIT;
 
 // init PC is the initial PC value after vblank
 // It comes from the copper control register.
-logic [10:0]  copper_init_pc;
-logic [10:0]  copper_pc;
+logic  [9:0]  copper_init_pc;
+logic  [9:0]  copper_pc;
 logic         copper_en;
 
 /* verilator lint_off UNUSED */
-logic [3:0]   reg_reserved;
+logic [4:0]   reg_reserved;
 /* verilator lint_on UNUSED */
 
 logic         ram_rd_strobe     = 1'b0;
@@ -231,8 +231,8 @@ logic         h_reached;
 always_ff @(posedge clk) begin
     if (reset_i) begin
         copper_en               <= 1'b0;
-        copper_init_pc          <= 11'h0;
-        copper_pc               <= 11'h0;
+        copper_init_pc          <= 10'h0;
+        copper_pc               <= 10'h0;
 
         copper_ex_state         <= STATE_INIT;
         ram_rd_strobe           <= 1'b0;
@@ -245,8 +245,8 @@ always_ff @(posedge clk) begin
             case (copp_reg_num_i[3:0])
                 xv::XR_COPP_CTRL[3:0]: begin
                     copper_en       <= copp_reg_data_i[15];
-                    reg_reserved    <= copp_reg_data_i[14:11];
-                    copper_init_pc  <= copp_reg_data_i[10:0];
+                    reg_reserved    <= copp_reg_data_i[14:10];
+                    copper_init_pc  <= copp_reg_data_i[9:0];
                 end
                 default: ;
             endcase
@@ -329,7 +329,6 @@ always_ff @(posedge clk) begin
                                     // Checking only horizontal position
                                     if (h_reached) begin
                                         // Setup fetch next instruction
-                                        copper_pc           <= copper_pc + 1;
                                         copper_ex_state     <= STATE_WAIT;
                                         ram_rd_strobe       <= 1'b1;
                                     end
@@ -344,7 +343,6 @@ always_ff @(posedge clk) begin
                                     // Checking only vertical position
                                     if (v_reached) begin
                                         // Setup fetch next instruction
-                                        copper_pc           <= copper_pc + 1;
                                         copper_ex_state     <= STATE_WAIT;
                                         ram_rd_strobe       <= 1'b1;
                                     end
@@ -357,7 +355,6 @@ always_ff @(posedge clk) begin
                                     // vertical positions
                                     if (h_reached && v_reached) begin
                                         // Setup fetch next instruction
-                                        copper_pc           <= copper_pc + 1;
                                         copper_ex_state     <= STATE_WAIT;
                                         ram_rd_strobe       <= 1'b1;
                                     end
@@ -374,14 +371,11 @@ always_ff @(posedge clk) begin
                                 if (r_insn[1]) begin
                                     // Ignoring horizontal position, so
                                     // always skip.
-                                    copper_pc       <= copper_pc + 3;
+                                    copper_pc       <= copper_pc + 1;
                                 end
                                 else begin
                                     // Checking only horizontal position
                                     if (h_reached) begin
-                                        copper_pc       <= copper_pc + 3;
-                                    end
-                                    else begin
                                         copper_pc       <= copper_pc + 1;
                                     end
                                 end
@@ -391,9 +385,6 @@ always_ff @(posedge clk) begin
                                 if (r_insn[1]) begin
                                     // Checking only vertical position
                                     if (v_reached) begin
-                                        copper_pc       <= copper_pc + 3;
-                                    end
-                                    else begin
                                         copper_pc       <= copper_pc + 1;
                                     end
                                 end
@@ -401,9 +392,6 @@ always_ff @(posedge clk) begin
                                     // Checking both horizontal and
                                     // vertical positions
                                     if (h_reached && v_reached) begin
-                                        copper_pc       <= copper_pc + 3;
-                                    end
-                                    else begin
                                         copper_pc       <= copper_pc + 1;
                                     end
                                 end
@@ -415,7 +403,7 @@ always_ff @(posedge clk) begin
                         end
                         INSN_JUMP: begin
                             // jmp
-                            copper_pc               <= r_insn[26:16];
+                            copper_pc               <= r_insn[25:16];
                             copper_ex_state         <= STATE_WAIT;
                             ram_rd_strobe           <= 1'b1;
                         end
@@ -428,7 +416,6 @@ always_ff @(posedge clk) begin
                                 ram_wr_data_out         <= r_insn[15:0];
 
                                 // Setup fetch next instruction
-                                copper_pc               <= copper_pc + 1;
                                 copper_ex_state         <= STATE_WAIT;
                                 ram_rd_strobe           <= 1'b1;
                             end
@@ -442,7 +429,6 @@ always_ff @(posedge clk) begin
                                 ram_wr_data_out         <= r_insn[15:0];
 
                                 // Setup fetch next instruction
-                                copper_pc               <= copper_pc + 1;
                                 copper_ex_state         <= STATE_WAIT;
                                 ram_rd_strobe           <= 1'b1;
                             end
@@ -456,7 +442,6 @@ always_ff @(posedge clk) begin
                                 ram_wr_data_out         <= r_insn[15:0];
 
                                 // Setup fetch next instruction
-                                copper_pc               <= copper_pc + 1;
                                 copper_ex_state         <= STATE_WAIT;
                                 ram_rd_strobe           <= 1'b1;
                             end
@@ -470,7 +455,6 @@ always_ff @(posedge clk) begin
                                 ram_wr_data_out         <= r_insn[15:0];
                         
                                 // Setup fetch next instruction
-                                copper_pc               <= copper_pc + 1;
                                 copper_ex_state         <= STATE_WAIT;
                                 ram_rd_strobe           <= 1'b1;
                             end
@@ -478,7 +462,6 @@ always_ff @(posedge clk) begin
                         default: begin
                             // illegal instruction; just setup fetch for 
                             // next instruction
-                            copper_pc       <= copper_pc + 1;
                             copper_ex_state <= STATE_WAIT;
                             ram_rd_strobe   <= 1'b1;
                         end
