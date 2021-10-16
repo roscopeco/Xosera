@@ -190,11 +190,10 @@ logic [31:0]  r_insn;
 typedef enum logic [2:0] {
     STATE_INIT      = 3'b000,
     STATE_WAIT      = 3'b001,
-    STATE_LATCH1    = 3'b010,
-    STATE_LATCH2    = 3'b011,
-    STATE_EXEC      = 3'b100,
-    STATE_EX_WAIT   = 3'b101,
-    STATE_EX_SKIP   = 3'b110
+    STATE_LATCH     = 3'b010,
+    STATE_EXEC      = 3'b011,
+    STATE_EX_WAIT   = 3'b100,
+    STATE_EX_SKIP   = 3'b101
 } copper_ex_state_t;
 
 logic  [2:0]  copper_ex_state   = STATE_INIT;
@@ -264,7 +263,7 @@ always_ff @(posedge clk) begin
         end
         else begin
             case (copper_ex_state)
-                // State 0 - Initial begin fetch first word
+                // State 0 - Init fetch first word
                 // This state is only used for the first instruction, or
                 // when the copper has stalled due to contention.
                 //
@@ -288,7 +287,7 @@ always_ff @(posedge clk) begin
                     // we don't go back to STATE_INIT...
                     if (copper_en) begin
                         // If copper is enabled, proceed
-                        copper_ex_state <= STATE_LATCH1;
+                        copper_ex_state <= STATE_LATCH;
                         copper_pc       <= copper_pc + 1;
                         ram_rd_strobe   <= 1'b1;
                     end
@@ -299,21 +298,18 @@ always_ff @(posedge clk) begin
                     end
                 end
                 // State 2 - Wait for copper RAM
-                STATE_LATCH1: begin
+                STATE_LATCH: begin
                     r_insn[31:16]   <= coppermem_e_rd_data_i;
                     r_insn[15:0]    <= coppermem_o_rd_data_i;
                     copper_ex_state <= STATE_EXEC;
                 end
-                // State 3 - Latch second word
-//                STATE_LATCH2: begin
-//                    ram_rd_strobe   <= 1'b0;
-//                    r_insn[15:0]    <= coppermem_rd_data_i;
-//                    copper_ex_state <= STATE_EXEC;
-//                end
-                // State 4 - Execution
+                // State 3 - Execution (Main)
                 STATE_EXEC: begin
 
                     case (r_insn[31:28])
+                        // WAIT and SKIP instructions have a second execution 
+                        // state, during which next instruction read is also 
+                        // set up...
                         INSN_WAIT: begin
                             v_reached       <= v_count_i >= r_insn[26:16];
                             h_reached       <= h_count_i >= r_insn[14:4];
@@ -330,9 +326,6 @@ always_ff @(posedge clk) begin
                             copper_ex_state         <= STATE_WAIT;
                             ram_rd_strobe           <= 1'b1;
                         end
-                        // All move instructions have a second wait state, 
-                        // during which next instruction read is also set
-                        // up...
                         INSN_MOVER: begin
                             // mover
                             if (!regs_xr_reg_sel_i) begin
@@ -398,7 +391,7 @@ always_ff @(posedge clk) begin
                         end
                     endcase // Instruction                  
                 end
-                // State 5 - Second state for WAIT instructions. This is where
+                // State 4 - Second state for WAIT instructions. This is where
                 // the actual position is checked.
                 STATE_EX_WAIT: begin
                     // executing wait
@@ -450,7 +443,7 @@ always_ff @(posedge clk) begin
                         end
                     end
                 end
-                // State 6 - Second state for SKIP instructions. This is where
+                // State 5 - Second state for SKIP instructions. This is where
                 // the actual position is checked.
                 STATE_EX_SKIP: begin
                     // skip
