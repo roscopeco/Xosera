@@ -162,26 +162,27 @@ assign bus_data_in  = bus_data;
 `endif
 
 `ifdef EN_DTACK
-logic dtack_out_ena;
-assign dtack_out_ena = (bus_cs_n == xv::CS_ENABLED);
+//logic dtack_out_ena;
+//assign dtack_out_ena = (bus_cs_n == xv::CS_ENABLED);
 `ifdef SYNTHESIS
 // NOTE: Use iCE40 SB_IO primitive to control tri-state properly here
 /* verilator lint_off PINMISSING */
-SB_IO #(
-    .PULLUP(1'b1),          //PULL_UP
-    .PIN_TYPE(6'b101001)    //PIN_OUTPUT_TRISTATE|PIN_INPUT
-) bus_dtack_pin (
-    .PACKAGE_PIN(serial_txd),
-    .INPUT_CLK(pclk),
-    .OUTPUT_CLK(pclk),
-    //        .CLOCK_ENABLE(1'b1),    // ICE Technology Library recommends leaving unconnected when always enabled to save a LUT
-    .OUTPUT_ENABLE(dtack_out_ena),
-    .D_OUT_0(bus_dtack),
-    .D_IN_0()
-);
+assign serial_txd    = bus_dtack; // dtack_out_ena ? bus_dtack : 1'bZ;
+// SB_IO #(
+//     .PULLUP(1'b1),          //PULL_UP
+//     .PIN_TYPE(6'b101001)    //PIN_OUTPUT_TRISTATE|PIN_INPUT
+// ) bus_dtack_pin (
+//     .PACKAGE_PIN(serial_txd),
+//     .INPUT_CLK(pclk),
+//     .OUTPUT_CLK(pclk),
+//     //        .CLOCK_ENABLE(1'b1),    // ICE Technology Library recommends leaving unconnected when always enabled to save a LUT
+//     .OUTPUT_ENABLE(1'b1), //dtack_out_ena),
+//     .D_OUT_0(bus_dtack),
+//     .D_IN_0()
+// );
 /* verilator lint_on PINMISSING */
 `else
-assign serial_txd    = dtack_out_ena ? bus_dtack : 1'bZ;
+assign serial_txd    = bus_dtack; // dtack_out_ena ? bus_dtack : 1'bZ;
 `endif
 `endif
 
