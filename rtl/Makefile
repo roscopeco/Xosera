@@ -3,8 +3,10 @@
 #
 
 VIDEO_MODE?=MODE_640x480
-AUDIO?=4
-PF_B?=true
+#AUDIO?=4
+#PF_B?=true
+AUDIO=0
+PF_B=false
 
 # Build all project targets
 all: sim upd iceb

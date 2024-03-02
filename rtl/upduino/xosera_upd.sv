@@ -125,10 +125,14 @@ assign bus_reg_num  = { gpio_27, gpio_26, gpio_25, gpio_23 };   // gpio for regi
 assign bus_data     = { gpio_28, gpio_38, gpio_42, gpio_36, gpio_43, gpio_34, gpio_37, gpio_31 };   // gpio for data bus
 
 // assign audio output signals to gpio
-assign gpio_32      = audio_l;          // left audio channel gpio
+assign gpio_32      = bus_dtack;          // left audio channel gpio
+// assign gpio_32      = audio_l;          // left audio channel gpio
 assign gpio_35      = audio_r;          // right audio channel gpio
 
 assign gpio_10      = bus_intr_r;         // interrupt signal
+
+logic unused_audio_l;
+assign unused_audio_l = &{1'b0, audio_l};
 
 // split tri-state data lines into in/out signals for inside FPGA
 logic bus_out_ena;
@@ -167,7 +171,8 @@ assign bus_data_in  = bus_data;
 `ifdef SYNTHESIS
 // NOTE: Use iCE40 SB_IO primitive to control tri-state properly here
 /* verilator lint_off PINMISSING */
-assign serial_txd    = bus_dtack; // dtack_out_ena ? bus_dtack : 1'bZ;
+//assign serial_txd    = bus_dtack; // dtack_out_ena ? bus_dtack : 1'bZ;
+assign gpio_32 = bus_dtack;
 // SB_IO #(
 //     .PULLUP(1'b1),          //PULL_UP
 //     .PIN_TYPE(6'b101001)    //PIN_OUTPUT_TRISTATE|PIN_INPUT
